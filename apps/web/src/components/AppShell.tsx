@@ -1,7 +1,7 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { getActorName, setActorName, subscribeActor } from "../api/actor";
-import { API_BASE_URL } from "../api/client";
+import { API_BASE_URL, getWorkerToken, setWorkerToken } from "../api/client";
 import { dictionaries, type Locale, useCopy, useLocale } from "../copy/CopyProvider";
 import { useKonami } from "../hooks/useKonami";
 import styles from "./AppShell.module.css";
@@ -35,6 +35,7 @@ export function AppShell() {
         </nav>
         <div className={styles.tools}>
           {pathname.startsWith("/inbox") && <ActorPicker />}
+          {pathname.startsWith("/inbox") && <WorkerLogin />}
           <LanguageSwitcher />
         </div>
       </header>
@@ -87,6 +88,26 @@ function ActorPicker() {
         placeholder={copy.worker.actorPlaceholder}
         maxLength={100}
         onChange={(event) => setActorName(event.target.value)}
+      />
+    </label>
+  );
+}
+
+/** Members only: the worker token unlocks the inbox API. */
+function WorkerLogin() {
+  const [token, setToken] = useState(getWorkerToken());
+  return (
+    <label className={styles.actor}>
+      <span>Worker token</span>
+      <input
+        type="password"
+        value={token}
+        autoComplete="current-password"
+        onChange={(event) => {
+          setToken(event.target.value);
+          setWorkerToken(event.target.value);
+        }}
+        onBlur={() => window.location.reload()}
       />
     </label>
   );

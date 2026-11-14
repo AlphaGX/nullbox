@@ -4,6 +4,7 @@ use axum::Json;
 use axum::extract::{FromRequest, FromRequestParts, Path, Query};
 use axum::http::request::Parts;
 use percent_encoding::percent_decode_str;
+use sha2::{Digest, Sha256};
 
 use crate::{ApiError, AppState};
 
@@ -27,7 +28,34 @@ pub struct Actor {
 impl FromRequestParts<AppState> for Actor {
     type Rejection = ApiError;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &AppState) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        // Members only: a worker token as `Authorization: Bearer`. A name header alone proves nothing.
+        let bearer = parts
+            .headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(str::trim);
+        let valid = bearer.is_some_and(|presented| {
+            let presented = Sha256::digest(presented.as_bytes());
+            state.config.worker_tokens.iter().any(|token| Sha256::digest(token.as_bytes()) == presented)
+        });
+        if !valid {
+            let claimed = parts.headers.get(ACTOR_HEADER).and_then(|v| v.to_str().ok()).map(|raw| {
+                percent_decode_str(raw).decode_utf8().map(|n| n.into_owned()).unwrap_or_else(|_| raw.to_owned())
+            });
+            state.audit.record(
+                "auth.refused",
+                claimed.as_deref(),
+                serde_json::json!({
+                    "method": parts.method.as_str(),
+                    "path": parts.uri.path(),
+                    "reason": if bearer.is_some() { "invalid token" } else { "no token" },
+                    "client_ip": parts.headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()),
+                }),
+            );
+            return Err(ApiError::Forbidden);
+        }
         let raw = parts.headers.get(ACTOR_HEADER).and_then(|v| v.to_str().ok()).ok_or(ApiError::MissingActor)?;
         let name = percent_decode_str(raw).decode_utf8().map_err(|_| ApiError::MissingActor)?;
         let name = name.trim();

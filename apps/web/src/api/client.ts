@@ -38,7 +38,29 @@ export class ApiError extends Error {
 /** Worker identity. Today an untrusted name header; tomorrow `Authorization: Bearer …`. */
 function authHeaders(): Record<string, string> {
   // Percent-encoded so non-ASCII names (e.g. 山田) survive HTTP headers.
-  return { "X-Actor-Name": encodeURIComponent(getActorName()) };
+  const headers: Record<string, string> = { "X-Actor-Name": encodeURIComponent(getActorName()) };
+  const token = getWorkerToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+const WORKER_TOKEN_KEY = "nullbox.workerToken";
+
+/** The worker's login token (members only). Kept in this browser. */
+export function getWorkerToken(): string {
+  try {
+    return localStorage.getItem(WORKER_TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function setWorkerToken(token: string): void {
+  try {
+    localStorage.setItem(WORKER_TOKEN_KEY, token.trim());
+  } catch {
+    // Private mode: the token lasts until reload.
+  }
 }
 
 function ticketTokenHeaders(token: string): Record<string, string> {

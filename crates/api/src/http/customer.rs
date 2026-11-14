@@ -13,6 +13,15 @@ pub async fn create_ticket(
     ApiJson(req): ApiJson<CreateTicketRequest>,
 ) -> Result<(StatusCode, Json<CreateTicketResponse>), ApiError> {
     let created = state.tickets.create(req).await?;
+    state.audit.record(
+        "ticket.created",
+        created.ticket.customer_name.as_deref(),
+        serde_json::json!({
+            "ticket_id": created.ticket.id,
+            "number": created.ticket.number,
+            "subject": created.ticket.subject,
+        }),
+    );
     let access_link = format!("{}/t/{}#{}", state.config.public_web_url, created.ticket.id, created.access_token);
     Ok((
         StatusCode::CREATED,

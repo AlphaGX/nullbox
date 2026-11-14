@@ -13,7 +13,9 @@ use crate::{ApiError, AppState};
 pub async fn export(State(state): State<AppState>, headers: HeaderMap) -> Result<Json<Vec<Ticket>>, ApiError> {
     let token = headers.get(ADMIN_TOKEN_HEADER).and_then(|value| value.to_str().ok());
     if token != Some(state.config.admin_token.as_str()) {
+        state.audit.record("admin.export.refused", None, serde_json::json!({ "path": "/api/admin/export" }));
         return Err(ApiError::Forbidden);
     }
+    state.audit.record("admin.export", None, serde_json::json!({}));
     Ok(Json(state.tickets.export().await?))
 }

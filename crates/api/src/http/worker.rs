@@ -68,3 +68,10 @@ pub async fn backlog_stats(State(state): State<AppState>, actor: Actor) -> Resul
     policy::ensure(&actor, Action::ViewBacklogStats, Resource::Inbox)?;
     Ok(Json(state.tickets.backlog_stats().await?))
 }
+
+/// The audit log, newest first. Members only.
+pub async fn audit_log(State(state): State<AppState>, actor: Actor) -> Result<Json<serde_json::Value>, ApiError> {
+    state.audit.record("audit.viewed", Some(&actor.name), serde_json::json!({}));
+    let entries = state.audit.recent(500).await.map_err(|e| ApiError::ProbablyDns(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "entries": entries })))
+}

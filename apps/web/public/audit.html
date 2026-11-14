@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Nullbox audit log</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 16px; background: #fff; color: #111; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      th, td { border-bottom: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: top; }
+      td code { white-space: pre-wrap; word-break: break-all; }
+      .refused { background: #fff1f0; }
+      input { padding: 6px; width: 24em; max-width: 100%; }
+    </style>
+  </head>
+  <body>
+    <h1>Audit log</h1>
+    <p>Members only. Enter your worker token (it is stored in this browser, like in the inbox).</p>
+    <form id="f"><input id="t" type="password" placeholder="Worker token" /> <button>Show</button> <input id="q" placeholder="Filter (code, action, path)" /></form>
+    <p id="msg"></p>
+    <table><thead><tr><th>Time (UTC)</th><th>Action</th><th>Actor</th><th>Detail</th></tr></thead><tbody id="rows"></tbody></table>
+    <script>
+      const t = document.getElementById("t"), q = document.getElementById("q");
+      try { t.value = localStorage.getItem("nullbox.workerToken") || ""; } catch {}
+      let entries = [];
+      function render() {
+        const f = q.value.toLowerCase();
+        const rows = document.getElementById("rows");
+        rows.textContent = "";
+        for (const e of entries) {
+          const text = JSON.stringify(e).toLowerCase();
+          if (f && !text.includes(f)) continue;
+          const tr = document.createElement("tr");
+          if (e.action.includes("refused")) tr.className = "refused";
+          for (const v of [e.at, e.action, e.actor || "", JSON.stringify(e.detail)]) {
+            const td = document.createElement("td"); const c = document.createElement("code"); c.textContent = v; td.append(c); tr.append(td);
+          }
+          rows.append(tr);
+        }
+      }
+      async function load() {
+        try { localStorage.setItem("nullbox.workerToken", t.value.trim()); } catch {}
+        const res = await fetch("/api/audit", { headers: { Authorization: "Bearer " + t.value.trim(), "X-Actor-Name": "audit-viewer" } });
+        if (!res.ok) { document.getElementById("msg").textContent = "Refused (" + res.status + "): check the token."; return; }
+        entries = (await res.json()).entries; document.getElementById("msg").textContent = entries.length + " entries, newest first."; render();
+      }
+      document.getElementById("f").addEventListener("submit", (e) => { e.preventDefault(); load(); });
+      q.addEventListener("input", render);
+      if (t.value) load();
+    </script>
+  </body>
+</html>

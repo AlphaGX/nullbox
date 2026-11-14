@@ -20,6 +20,7 @@ async fn app() -> Router {
         stripe_api_key: None,
         stripe_price_id: "price_test".into(),
         mcp_tokens: vec!["test-mcp-token-0123456789".into()],
+        worker_tokens: vec!["test-worker-token-0123456789".into()],
     };
     http::router(AppState::new(pool, config))
 }
@@ -50,6 +51,7 @@ async fn send(
 }
 
 const WORKER: (&str, &str) = ("x-actor-name", "%E5%B1%B1%E7%94%B0"); // 山田, percent-encoded
+const LOGIN: (&str, &str) = ("authorization", "Bearer test-worker-token-0123456789");
 
 #[tokio::test]
 async fn customer_and_worker_round_trip() {
@@ -81,21 +83,21 @@ async fn customer_and_worker_round_trip() {
     assert_eq!((status, &error["code"]), (StatusCode::NOT_FOUND, &json!("not_found")));
 
     // The worker sees it in the inbox, notes internally and yeets it.
-    let (_, inbox) = send(&app, "GET", "/api/tickets", &[WORKER], None).await;
+    let (_, inbox) = send(&app, "GET", "/api/tickets", &[WORKER, LOGIN], None).await;
     assert_eq!(inbox.as_array().unwrap().len(), 1);
     let (status, _) = send(
         &app,
         "POST",
         &format!("/api/tickets/{id}/messages"),
-        &[WORKER],
+        &[WORKER, LOGIN],
         Some(json!({ "body": "it's always DNS", "internal": true })),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
-    let (status, yeeted) = send(&app, "POST", &format!("/api/tickets/{id}/yeet"), &[WORKER], None).await;
+    let (status, yeeted) = send(&app, "POST", &format!("/api/tickets/{id}/yeet"), &[WORKER, LOGIN], None).await;
     assert_eq!((status, &yeeted["status"]), (StatusCode::OK, &json!("resolved")));
 
-    let (_, stats) = send(&app, "GET", "/api/stats/backlog", &[WORKER], None).await;
+    let (_, stats) = send(&app, "GET", "/api/stats/backlog", &[WORKER, LOGIN], None).await;
     assert_eq!(stats, json!({ "open_count": 0, "beast_mood": "asleep", "oldest_open_age_secs": null }));
 
     // The customer never sees internal notes, and replying reopens the ticket.
@@ -120,7 +122,7 @@ async fn customer_and_worker_round_trip() {
     );
 
     // The worker view does include the note, written by 山田.
-    let (_, thread) = send(&app, "GET", &format!("/api/tickets/{id}"), &[WORKER], None).await;
+    let (_, thread) = send(&app, "GET", &format!("/api/tickets/{id}"), &[WORKER, LOGIN], None).await;
     let note = thread["messages"].as_array().unwrap().iter().find(|m| m["internal"] == true).unwrap();
     assert_eq!(note["author_name"], "山田");
 }
@@ -130,13 +132,15 @@ async fn errors_share_one_shape() {
     let app = app().await;
 
     let (status, error) = send(&app, "GET", "/api/tickets", &[], None).await;
+    assert_eq!((status, &error["code"]), (StatusCode::FORBIDDEN, &json!("forbidden")));
+    let (status, error) = send(&app, "GET", "/api/tickets", &[LOGIN], None).await;
     assert_eq!((status, &error["code"]), (StatusCode::UNAUTHORIZED, &json!("missing_actor")));
 
     let (status, error) =
         send(&app, "POST", "/api/tickets", &[], Some(json!({ "subject": " ", "body": "x", "severity": "p4" }))).await;
     assert_eq!((status, &error["code"]), (StatusCode::UNPROCESSABLE_ENTITY, &json!("validation_failed")));
 
-    let (status, error) = send(&app, "GET", "/api/tickets/not-a-uuid", &[WORKER], None).await;
+    let (status, error) = send(&app, "GET", "/api/tickets/not-a-uuid", &[WORKER, LOGIN], None).await;
     assert_eq!((status, &error["code"]), (StatusCode::NOT_FOUND, &json!("not_found")));
 
     let (status, error) = send(&app, "GET", "/api/teapot", &[], None).await;
@@ -213,4 +217,26 @@ async fn mcp_needs_a_token_and_lists_tools() {
     let (status, body) = send(&app, "POST", "/mcp", &[auth], Some(call)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["result"]["isError"], false);
+}
+
+#[tokio::test]
+async fn worker_api_is_members_only() {
+    let app = app().await;
+    let (status, _) = send(&app, "GET", "/api/tickets", &[WORKER], None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) =
+        send(&app, "GET", "/api/tickets", &[WORKER, ("authorization", "Bearer made-up-token-123456")], None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = send(&app, "GET", "/api/tickets", &[WORKER, LOGIN], None).await;
+    assert_eq!(status, StatusCode::OK);
+    // Customers still file tickets without logging in.
+    let (status, _) = send(
+        &app,
+        "POST",
+        "/api/tickets",
+        &[],
+        Some(json!({ "subject": "Still open to customers", "body": "Yes.", "severity": "p4" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
 }

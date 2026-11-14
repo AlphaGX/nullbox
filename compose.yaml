@@ -10,6 +10,7 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in .env}
       STRIPE_API_KEY: ${STRIPE_API_KEY:-}
       MCP_TOKENS: ${MCP_TOKENS:-}
+      WORKER_TOKENS: ${WORKER_TOKENS:-}
       # OpenTelemetry export (traces + logs); unset endpoint = off.
       OTEL_SERVICE_NAME: nullbox-api
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
