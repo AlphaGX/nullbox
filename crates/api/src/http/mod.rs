@@ -30,7 +30,7 @@ async fn require_bearer(
     next: Next,
 ) -> Response {
     // Public API routes.
-    if !request.uri().path().eq("/api/ticket") {
+    if !request.uri().path().eq("/api/tickets") {
         return next.run(request).await;
     }
 
