@@ -3,6 +3,12 @@
 	handle /api/* {
 		reverse_proxy api:3000
 	}
+	# Real files only: a missing robots.txt, llms.txt or /.well-known/* answers 404, not the app.
+	@file path *.* /.well-known/*
+	handle @file {
+		root * /srv
+		file_server
+	}
 	handle {
 		root * /srv
 		try_files {path} /index.html

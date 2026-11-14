@@ -1,0 +1,13 @@
+# Nullbox
+
+> Nullbox is a small help desk. Customers report problems as tickets and follow them with a private link; support workers answer them in the inbox.
+
+## For people and agents
+
+- [Report a problem](https://team-10.fasthacks.cloud/): the form on the home page creates a ticket (subject, description, severity P1 to P4) and returns a private link to follow it.
+- [API health](https://team-10.fasthacks.cloud/api/healthz): returns `{"status":"ok"}` when the service is up.
+
+## API
+
+- `POST /api/tickets` with JSON `{ "subject", "body", "severity": "p1"|"p2"|"p3"|"p4" }` creates a ticket.
+- `GET /api/public/tickets/{id}` with header `X-Ticket-Token` reads your ticket.
