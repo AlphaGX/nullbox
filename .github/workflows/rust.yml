@@ -1,22 +1,51 @@
+
 name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update Rust stable
+        if: github.event_name == 'push'
+        run: |
+          rustup update stable
+          rustup default stable
+
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Create HOT Release Candidate
+        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'HOT')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAG="rc-${SHORT_SHA}"
+
+          cargo build -p nullbox-api --release
+
+          gh release create "$TAG" \
+            target/release/nullbox-api \
+            --title "Release Candidate ${TAG}" \
+            --notes "Automated RC for commit: ${GITHUB_SHA}" \
+            --prerelease
