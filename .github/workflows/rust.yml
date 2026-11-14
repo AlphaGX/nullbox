@@ -23,15 +23,17 @@ jobs:
           fetch-depth: 0
 
       - name: Update Rust stable
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'HOT')
         run: |
           rustup update stable
           rustup default stable
 
       - name: Build
+        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'HOT')
         run: cargo build --verbose
 
       - name: Run tests
+        if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'HOT')
         run: cargo test --verbose
 
       - name: Create HOT Release Candidate
