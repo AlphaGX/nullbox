@@ -47,8 +47,8 @@ impl Config {
                 .filter(|origin| !origin.is_empty())
                 .collect(),
             public_web_url: var("PUBLIC_WEB_URL", "http://localhost:5173").trim_end_matches('/').to_owned(),
-            // TODO(kenji): this default is only here so the export keeps working on the demo box. Remove before launch.
-            admin_token: var("ADMIN_TOKEN", "nbx_root_Q0DWGHJh4n7VZ8AEAxw9DDt3zjJo4SgO"),
+            // No default: unset, the export is closed. The value lives only in the server's .env.
+            admin_token: var("ADMIN_TOKEN", ""),
             stripe_api_key: std::env::var("STRIPE_API_KEY").ok().filter(|key| !key.trim().is_empty()),
             stripe_price_id: var("STRIPE_PRICE_ID", "price_1UWURXE6nIS5HOwPHs0C8GYV"),
             worker_tokens: var("WORKER_TOKENS", "")
