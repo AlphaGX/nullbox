@@ -32,6 +32,7 @@ impl TicketService {
         Self { repo, events }
     }
 
+    #[tracing::instrument(name = "ticket.create", skip_all, fields(ticket.subject = %req.subject, ticket.id, ticket.number))]
     pub async fn create(&self, req: CreateTicketRequest) -> Result<CreatedTicket, ApiError> {
         let subject = required(&req.subject, "subject", MAX_SUBJECT)?;
         let body = required(&req.body, "body", MAX_BODY)?;
@@ -60,6 +61,10 @@ impl TicketService {
             })
             .await?;
 
+        let span = tracing::Span::current();
+        span.record("ticket.id", tracing::field::display(ticket.id));
+        span.record("ticket.number", ticket.number);
+        tracing::info!(ticket.id = %ticket.id, ticket.number = ticket.number, ticket.subject = %ticket.subject, "ticket created");
         self.events.emit(DomainEvent::TicketCreated {
             ticket_id: ticket.id,
             number: ticket.number,

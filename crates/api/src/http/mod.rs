@@ -42,7 +42,13 @@ pub fn router(state: AppState) -> Router {
 /// Routes outside `/api` (an MCP server at `/mcp`, say) go next to the `nest` in
 /// `router`, so they pass through here too.
 pub fn middleware<S: Clone + Send + Sync + 'static>(router: Router<S>, config: &Config) -> Router<S> {
-    router.layer(cors(config)).layer(TraceLayer::new_for_http())
+    let trace = TraceLayer::new_for_http().make_span_with(crate::telemetry::request_span).on_response(
+        |response: &axum::http::Response<_>, latency: std::time::Duration, span: &tracing::Span| {
+            span.record("http.response.status_code", response.status().as_u16());
+            tracing::debug!(status = response.status().as_u16(), ?latency, "response");
+        },
+    );
+    router.layer(cors(config)).layer(trace)
 }
 
 /// CORS for the web app on another origin (Vite in dev, Tauri). `Authorization` is
