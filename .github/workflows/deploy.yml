@@ -105,21 +105,9 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           scp -i ~/.ssh/deploy compose.yaml "$SSH_USER@$SSH_HOST:nullbox/compose.yaml"
-          # The job's own token can pull this repo's packages; it expires with the job.
-          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy "$SSH_USER@$SSH_HOST" \
-            "API_IMAGE='$API_IMAGE' WEB_IMAGE='$WEB_IMAGE' ACTOR='${{ github.actor }}' bash -s" <<'REMOTE'
-          set -euo pipefail
-          token="$(cat)"
-          cd ~/nullbox
-          # Record the running version in .env, so a plain `docker compose up -d` keeps it.
-          sed -i '/^API_IMAGE=/d;/^WEB_IMAGE=/d' .env
-          printf 'API_IMAGE=%s\nWEB_IMAGE=%s\n' "$API_IMAGE" "$WEB_IMAGE" >> .env
-          printf '%s' "$token" | docker login ghcr.io -u "$ACTOR" --password-stdin >/dev/null
-          trap 'docker logout ghcr.io >/dev/null' EXIT
-          docker compose pull -q
-          docker compose up -d --no-build --wait --wait-timeout 90
-          docker image prune -af --filter until=24h >/dev/null || true
-          REMOTE
+          # stdin: first line the job's GHCR token (expires with the job), then the script.
+          { printf '%s\n' "$GHCR_TOKEN"; cat deploy/remote-deploy.sh; } | ssh -i ~/.ssh/deploy "$SSH_USER@$SSH_HOST" \
+            "API_IMAGE='$API_IMAGE' WEB_IMAGE='$WEB_IMAGE' ACTOR='${{ github.actor }}' bash -c 'read -r GHCR_TOKEN; export GHCR_TOKEN; exec bash -s'"
       - name: Smoke test
         run: |
           for i in $(seq 1 20); do
