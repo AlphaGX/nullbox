@@ -58,9 +58,13 @@ pub fn init() -> anyhow::Result<Telemetry> {
     let otel_traces =
         tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer("nullbox-api")).with_filter(filter());
     // The OTLP exporter logs through `tracing` itself; keep those out of the export loop.
-    let otel_logs = OpenTelemetryTracingBridge::new(&logger_provider)
-        .with_filter(filter().add_directive("opentelemetry=off".parse()?).add_directive("reqwest=off".parse()?)
-            .add_directive("hyper=off".parse()?).add_directive("h2=off".parse()?));
+    let otel_logs = OpenTelemetryTracingBridge::new(&logger_provider).with_filter(
+        filter()
+            .add_directive("opentelemetry=off".parse()?)
+            .add_directive("reqwest=off".parse()?)
+            .add_directive("hyper=off".parse()?)
+            .add_directive("h2=off".parse()?),
+    );
 
     tracing_subscriber::registry().with(fmt).with(otel_traces).with(otel_logs).init();
     tracing::info!("OpenTelemetry export on");

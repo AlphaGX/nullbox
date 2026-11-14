@@ -17,6 +17,8 @@ async fn app() -> Router {
         cors_allowed_origins: vec!["http://localhost:5173".into()],
         public_web_url: "http://localhost:5173".into(),
         admin_token: "test-admin-token".into(),
+        stripe_api_key: None,
+        stripe_price_id: "price_test".into(),
     };
     http::router(AppState::new(pool, config))
 }
@@ -155,4 +157,28 @@ async fn admin_export_needs_the_admin_token() {
     let (status, tickets) = send(&app, "GET", "/api/admin/export", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(tickets[0]["customer_email"], "a@example.com");
+}
+
+#[tokio::test]
+async fn customer_link_opens_only_its_own_ticket() {
+    let app = app().await;
+    let new = |subject: &str| json!({ "subject": subject, "body": "Hi.", "severity": "p3" });
+    let (_, a) = send(&app, "POST", "/api/tickets", &[], Some(new("Mine"))).await;
+    let (_, b) = send(&app, "POST", "/api/tickets", &[], Some(new("Someone else's"))).await;
+    let a_token = a["access_token"].as_str().unwrap();
+    let b_id = b["ticket"]["id"].as_str().unwrap();
+
+    // A's token with B's ID: neither readable nor answerable.
+    let (status, _) =
+        send(&app, "GET", &format!("/api/public/tickets/{b_id}"), &[("x-ticket-token", a_token)], None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = send(
+        &app,
+        "POST",
+        &format!("/api/public/tickets/{b_id}/messages"),
+        &[("x-ticket-token", a_token)],
+        Some(json!({ "body": "Hijacked" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }

@@ -2,8 +2,8 @@
 
 mod admin;
 mod customer;
-mod payments;
 pub mod extract;
+mod payments;
 mod utility;
 mod worker;
 
