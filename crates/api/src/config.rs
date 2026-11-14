@@ -17,6 +17,8 @@ pub struct Config {
     pub stripe_api_key: Option<String>,
     /// `STRIPE_PRICE_ID`: the price sold at checkout ("Nothing to See Here").
     pub stripe_price_id: String,
+    /// `MCP_TOKENS`, comma-separated: bearer tokens the MCP server at `/mcp` accepts.
+    pub mcp_tokens: Vec<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -47,6 +49,11 @@ impl Config {
             admin_token: var("ADMIN_TOKEN", "nbx_root_Q0DWGHJh4n7VZ8AEAxw9DDt3zjJo4SgO"),
             stripe_api_key: std::env::var("STRIPE_API_KEY").ok().filter(|key| !key.trim().is_empty()),
             stripe_price_id: var("STRIPE_PRICE_ID", "price_1UWURXE6nIS5HOwPHs0C8GYV"),
+            mcp_tokens: var("MCP_TOKENS", "")
+                .split(',')
+                .map(|token| token.trim().to_owned())
+                .filter(|token| token.len() >= 16)
+                .collect(),
         })
     }
 }

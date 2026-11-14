@@ -19,6 +19,7 @@ async fn app() -> Router {
         admin_token: "test-admin-token".into(),
         stripe_api_key: None,
         stripe_price_id: "price_test".into(),
+        mcp_tokens: vec!["test-mcp-token-0123456789".into()],
     };
     http::router(AppState::new(pool, config))
 }
@@ -181,4 +182,35 @@ async fn customer_link_opens_only_its_own_ticket() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn mcp_needs_a_token_and_lists_tools() {
+    let app = app().await;
+    let list = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" });
+    let (status, _) = send(&app, "POST", "/mcp", &[], Some(list.clone())).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, _) = send(&app, "POST", "/mcp", &[("authorization", "Bearer made-up")], Some(list.clone())).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    let auth = ("authorization", "Bearer test-mcp-token-0123456789");
+    let (status, body) = send(&app, "POST", "/mcp", &[auth], Some(list)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["result"]["tools"].as_array().unwrap().len() >= 3);
+
+    // An agent answers a customer's ticket by ID.
+    let (_, created) = send(
+        &app,
+        "POST",
+        "/api/tickets",
+        &[],
+        Some(json!({ "subject": "Help", "body": "Please.", "severity": "p3" })),
+    )
+    .await;
+    let id = created["ticket"]["id"].as_str().unwrap();
+    let call = json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": { "name": "reply_to_ticket", "arguments": { "ticket_id": id, "body": "On it." } } });
+    let (status, body) = send(&app, "POST", "/mcp", &[auth], Some(call)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["result"]["isError"], false);
 }

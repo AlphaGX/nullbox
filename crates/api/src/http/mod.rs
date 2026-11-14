@@ -3,6 +3,7 @@
 mod admin;
 mod customer;
 pub mod extract;
+mod mcp;
 mod payments;
 mod utility;
 mod worker;
@@ -36,7 +37,8 @@ pub fn router(state: AppState) -> Router {
         .route("/teapot", get(utility::teapot));
 
     let config = state.config.clone();
-    middleware(Router::new().nest("/api", api).fallback(utility::not_found), &config).with_state(state)
+    let app = Router::new().nest("/api", api).route("/mcp", post(mcp::post).get(mcp::get));
+    middleware(app.fallback(utility::not_found), &config).with_state(state)
 }
 
 /// The one place for cross-cutting layers. Tracing exporters, rate limiting,
