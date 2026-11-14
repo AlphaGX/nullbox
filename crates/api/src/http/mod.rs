@@ -17,6 +17,47 @@ use tower_http::trace::TraceLayer;
 use crate::{AppState, Config};
 use extract::{ACTOR_HEADER, TICKET_TOKEN_HEADER};
 
+use axum::{
+    extract::{Request, State},
+    http::{StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
+
+async fn require_bearer(
+    State(expected_token): State<String>,
+    request: Request,
+    next: Next,
+) -> Response {
+    // Public API routes.
+    if request.uri().path().starts_with("/api/public/") {
+        return next.run(request).await;
+    }
+
+    let token = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "));
+
+    let authorized = token
+        .map(|token| {
+            bool::from(token.as_bytes().eq(expected_token.as_bytes()))
+        })
+        .unwrap_or(false);
+
+    if !authorized {
+        return (
+            StatusCode::UNAUTHORIZED,
+            [(header::WWW_AUTHENTICATE, "Bearer")],
+            "Unauthorized",
+        )
+            .into_response();
+    }
+
+    next.run(request).await
+}
+
 pub fn router(state: AppState) -> Router {
     let api = Router::new()
         // customers
@@ -54,6 +95,11 @@ pub fn middleware<S: Clone + Send + Sync + 'static>(router: Router<S>, config: &
         },
     );
     router.layer(cors(config)).layer(trace)
+    .layer(
+        axum::middleware::from_fn_with_state(
+            config.admin_token.clone(),
+            require_bearer,
+        ))
 }
 
 /// CORS for the web app on another origin (Vite in dev, Tauri). `Authorization` is
