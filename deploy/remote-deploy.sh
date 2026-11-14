@@ -3,6 +3,9 @@
 # (the job's own, short-lived); API_IMAGE, WEB_IMAGE and ACTOR come from the command line.
 set -euo pipefail
 cd ~/nullbox
+# One deploy at a time; the others wait their turn.
+exec 9>.deploy.lock
+flock -w 300 9
 # Record the running version in .env, so a plain `docker compose up -d` keeps it.
 sed -i '/^API_IMAGE=/d;/^WEB_IMAGE=/d' .env
 printf 'API_IMAGE=%s\nWEB_IMAGE=%s\n' "$API_IMAGE" "$WEB_IMAGE" >> .env

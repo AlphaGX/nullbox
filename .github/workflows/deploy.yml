@@ -8,9 +8,9 @@ on:
   pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# No `concurrency:` on purpose: GitHub keeps only one queued run per group and cancels the
+# rest, which would cancel runs for commits that must ship. Deploys queue on the server
+# instead (flock in deploy/remote-deploy.sh).
 
 env:
   CARGO_TERM_COLOR: always
@@ -64,9 +64,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
     env:
       SSH_HOST: team-10.fasthacks.cloud
       SSH_USER: deploy
