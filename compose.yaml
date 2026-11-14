@@ -1,0 +1,31 @@
+# Production stack: Caddy (TLS, SPA, /api proxy) in front of the API. Settings in .env next to this file.
+services:
+  api:
+    image: ${API_IMAGE:-nullbox-api:local}
+    build: { context: ., target: api }
+    restart: unless-stopped
+    environment:
+      PUBLIC_WEB_URL: https://${SITE_ADDRESS}
+      CORS_ALLOWED_ORIGINS: https://${SITE_ADDRESS}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in .env}
+    volumes:
+      - data:/data
+  web:
+    image: ${WEB_IMAGE:-nullbox-web:local}
+    build: { context: ., target: web }
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: { condition: service_healthy }
+volumes:
+  data:
+  caddy_data:
+  caddy_config:
