@@ -1,6 +1,7 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { getActorName, setActorName, subscribeActor } from "../api/actor";
+import { API_BASE_URL } from "../api/client";
 import { dictionaries, type Locale, useCopy, useLocale } from "../copy/CopyProvider";
 import { useKonami } from "../hooks/useKonami";
 import styles from "./AppShell.module.css";
@@ -40,7 +41,15 @@ export function AppShell() {
       <main className={styles.main}>
         <Outlet />
       </main>
-      <footer className={styles.footer}>{copy.app.footer}</footer>
+      <footer className={styles.footer}>
+        {copy.app.footer}
+        <form method="post" action={`${API_BASE_URL}/api/checkout`} className={styles.buy}>
+          {new URLSearchParams(window.location.search).get("paid") === "1" && (
+            <p role="status">Thank you! Payment received.</p>
+          )}
+          <button type="submit">Subscribe to "Nothing to See Here" (¥100 a day)</button>
+        </form>
+      </footer>
       {enterprise && <EnterpriseMode onExit={() => setEnterprise(false)} />}
     </div>
   );

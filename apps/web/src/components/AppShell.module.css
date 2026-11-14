@@ -111,3 +111,7 @@
   font-size: var(--text-xs);
   padding: var(--space-5);
 }
+
+.buy {
+  margin-top: 0.75rem;
+}

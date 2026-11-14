@@ -30,6 +30,7 @@ opentelemetry-otlp.workspace = true
 opentelemetry-http.workspace = true
 opentelemetry-appender-tracing.workspace = true
 tracing-opentelemetry.workspace = true
+reqwest.workspace = true
 ts-rs.workspace = true
 uuid.workspace = true
 

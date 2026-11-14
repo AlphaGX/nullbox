@@ -2,6 +2,7 @@
 
 mod admin;
 mod customer;
+mod payments;
 pub mod extract;
 mod utility;
 mod worker;
@@ -28,6 +29,8 @@ pub fn router(state: AppState) -> Router {
         .route("/stats/backlog", get(worker::backlog_stats))
         // admin
         .route("/admin/export", get(admin::export))
+        // payments
+        .route("/checkout", post(payments::checkout))
         // utility
         .route("/healthz", get(utility::healthz))
         .route("/teapot", get(utility::teapot));
